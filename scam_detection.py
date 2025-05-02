@@ -244,3 +244,14 @@ if __name__ == "__main__":
         data={"url": test_url}
     )
     print("URL scan test:", response.json())
+
+    with open("test_voice.wav", "rb") as f:
+        files = {"file": ("voice.wav", f, "audio/wav")}
+        response = requests.post(
+            "http://localhost:8001/scan/voice",
+            files=files,
+            timeout=30  # Increased timeout for audio processing
+        )
+            
+    print("Status Code:", response.status_code)
+    print("Response:", response.json())
