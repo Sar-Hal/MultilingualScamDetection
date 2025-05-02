@@ -222,7 +222,6 @@ async def scan_url(url: str = Form(...)):
             content={"error": f"URL check failed: {str(e)}"}
         )
 
-# Run the server on port 8001 to avoid conflicts
 import uvicorn
 import threading
 
@@ -232,20 +231,13 @@ def run_server():
 if __name__ == "__main__":
     thread = threading.Thread(target=run_server, daemon=True)
     thread.start()
-    
-    # Test endpoints
     import requests
-    
-    # Test text scan
-    #test_message = "URGENT! Your PayPal account needs verification: http://fake-paypal-login.ru"
-    # Test with known scam pattern
     response = requests.post(
         "http://localhost:8001/scan/text",
         data={"message": "Verify your PayPal account to avoid suspension: http://fake-paypal-login.ru"}
     )
     print("Text scan test:", response.json())
     
-    # Test URL scan
     test_url = "https://www.google.com"
     response = requests.post(
         "http://localhost:8001/scan/url",
