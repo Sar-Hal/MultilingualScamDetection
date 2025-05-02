@@ -140,7 +140,7 @@ def send_whatsapp_response(to: str, message: str, token: str, phone_number_id: s
 
 # Test the STT logic
 def test_stt():
-    audio_file_path = "test_voice.wav"  # Path to your test audio file
+    audio_file_path = "C:\Users\Arkabrata\Pictures\WhatsApp Audio 2025-05-03 at 02.29.11_9d0a9a28.waptt.opus"  # Path to your test audio file
     try:
         transcribed_text = transcribe_audio(audio_file_path)
         print("Transcribed text:", transcribed_text)
