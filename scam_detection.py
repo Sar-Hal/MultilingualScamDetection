@@ -99,6 +99,7 @@ def analyze_text(text: str) -> dict:
     """
 
     try:
+        # Update the generation_config in analyze_text()
         response = model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(
@@ -114,7 +115,10 @@ def analyze_text(text: str) -> dict:
                                 "type": "object",
                                 "properties": {
                                     "category": {"type": "string"},
-                                    "examples_found": {"type": "array"}
+                                    "examples_found": {
+                                        "type": "array",  # Fixed array definition
+                                        "items": {"type": "string"}  # Added item type
+                                    }
                                 }
                             }
                         },
@@ -123,10 +127,26 @@ def analyze_text(text: str) -> dict:
                 }
             )
         )
+
         result = json.loads(response.text)
+        
+        if lang != 'en':
+            result['justification'] = translate_text(result['justification'], src='en', dest=lang)
+            
+        return result
+
     except Exception as e:
         logger.error(f"Analysis failed: {str(e)}")
-        return error_response()
+        return error_response(str(e))
+    
+def error_response(message: str = "Analysis failed") -> dict:
+    return {
+        "risk_level": "Error",
+        "confidence_score": 0,
+        "detected_patterns": [],
+        "justification": message
+    }
+
 
 def transcribe_voice(audio_file_bytes: bytes) -> str:
     try:
@@ -217,10 +237,11 @@ if __name__ == "__main__":
     import requests
     
     # Test text scan
-    test_message = "URGENT! Your PayPal account needs verification: http://fake-paypal-login.ru"
+    #test_message = "URGENT! Your PayPal account needs verification: http://fake-paypal-login.ru"
+    # Test with known scam pattern
     response = requests.post(
         "http://localhost:8001/scan/text",
-        data={"message": test_message}
+        data={"message": "Verify your PayPal account to avoid suspension: http://fake-paypal-login.ru"}
     )
     print("Text scan test:", response.json())
     
