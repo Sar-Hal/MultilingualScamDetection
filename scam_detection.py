@@ -234,7 +234,7 @@ if __name__ == "__main__":
     import requests
     response = requests.post(
         "http://localhost:8001/scan/text",
-        data={"message": "Verify your PayPal account to avoid suspension: http://fake-paypal-login.ru"}
+        data={"message": "VERIFY your account http://fake-paypal-login.ru"}
     )
     print("Text scan test:", response.json())
     
