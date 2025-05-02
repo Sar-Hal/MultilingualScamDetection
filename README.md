@@ -1,0 +1,2 @@
+# MultilingualScamDetection
+Global AI Hackathon
