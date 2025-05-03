@@ -44,7 +44,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Configure API keys from environment variables
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))  # Updated to match correct env var
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY")) # Updated to match correct env var
 google_api_key = os.getenv("GOOGLE_SAFE_BROWSING_API_KEY")
 
 # Language to alert audio mapping
@@ -102,7 +102,8 @@ def check_scam(content: str, lang: str) -> Tuple[bool, Dict]:
     """
     try:
         model = genai.GenerativeModel("gemini-1.5-pro")
-        response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(response_mime_type="application/json"))
+        response = client.models.generate_content(model="gemini-1.5-pro",contents=prompt, generation_config=genai.types.GenerationConfig(response_mime_type="application/json"))
+        
         result = json.loads(response.text)
         return (result["risk_level"] == "Scam", result)
     except Exception as e:
