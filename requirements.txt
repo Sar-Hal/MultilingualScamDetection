@@ -10,3 +10,4 @@ langdetect==1.0.9
 python-dotenv==1.0.0
 pyttsx3==2.90
 tenacity==8.2.1
+python-multipart
