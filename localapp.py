@@ -247,3 +247,4 @@ if __name__ == "__main__":
      test_url = "https://www.google.com"
      response = requests.post("http://localhost:8001/scan/url", data={"url": test_url})
      print("URL scan test:", response.json())
+     test_audio_scam_detection("test_voice.wav")
