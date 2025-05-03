@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import google.genai as genai  # Updated import as per previous guidance
+import google_genai as genai
 import os
 import requests
 import re
