@@ -156,27 +156,27 @@ def check_url(url: str) -> bool:
 
 def transcribe_audio(file_path: str) -> Tuple[str, str]:
     try:
-        # Specify compute_type explicitly for CPU
-        model = WhisperModel("base", 
-                           device="cpu", 
-                           compute_type="int8",  # Required for CPU
-                           download_root="/tmp/whisper")  # Set cache directory
-                           
+        model = WhisperModel(
+            "base",
+            device="cpu",
+            compute_type="int8",  # Required for CPU compatibility
+            download_root="/tmp/whisper",
+            local_files_only=True  # Prevent redownloading
+        )
+        
+        # Force sample rate conversion for compatibility
         segments, info = model.transcribe(
             file_path,
             beam_size=5,
-            language="en",  # Force language if known
-            vad_filter=True  # Add voice activity detection
+            vad_filter=True,
+            initial_prompt="",  # Disable language auto-detection
+            language="en"       # Set explicitly if known
         )
-        
-        # Handle empty segments
-        if not segments:
-            return "", "en"  # Default to English if no speech detected
-            
         return " ".join(segment.text for segment in segments), info.language or "en"
     except Exception as e:
         logger.error(f"Transcription failed: {str(e)}")
         return f"Error: {str(e)}", "en"
+
 
 # Endpoints
 @app.post("/scan/text")
