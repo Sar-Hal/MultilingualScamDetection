@@ -41,10 +41,10 @@ app = FastAPI(title="Scam Detection API", version="1.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"],  # Explicitly allow all methods
     allow_headers=["*"]
 )
+
 
 # Mount static directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -53,6 +53,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))  # Use correct env var name
 google_api_key = os.getenv("GOOGLE_SAFE_BROWSING_API_KEY")
 
+@app.api_route("/", methods=["GET", "HEAD"])
+async def root():
+    return {
+        "status": "API operational",
+        "endpoints": ["/scan/text", "/scan/voice", "/scan/url"]
+    }
 # Language mappings
 ALERT_AUDIOS = {
     "en": "alert_en.wav",
