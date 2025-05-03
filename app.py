@@ -118,7 +118,14 @@ def check_scam(content: str, lang: str) -> Tuple[bool, Dict]:
             generation_config={"response_mime_type": "application/json"}
         )
         result = json.loads(response.text)
-        return (result.get("risk_level", "").lower() == "scam", result)
+        
+        # Check if scam_indicators exist and are not empty
+        has_indicators = "scam_indicators" in result and len(result["scam_indicators"]) > 0
+        
+        # Either check for risk_level OR scam_indicators
+        is_scam = result.get("risk_level", "").lower() == "scam" or has_indicators
+        
+        return (is_scam, result)
     except Exception as e:
         logger.error(f"GenAI error: {str(e)}")
         return False, {"error": str(e)}
