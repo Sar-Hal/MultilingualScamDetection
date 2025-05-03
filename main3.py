@@ -42,8 +42,8 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 google_api_key = os.getenv("GOOGLE_SAFE_BROWSING_API_KEY")
 
 # Audio file paths from environment variables
-TEST_AUDIO_PATH = os.getenv("TEST_AUDIO_PATH", r"C:\Users\Arkabrata\Downloads\WhatsApp Audio 2025-05-03 at 02.29.11_9d0a9a28.waptt.wav")
-ALERT_AUDIO_PATH = os.getenv("ALERT_AUDIO_PATH", r"C:\Users\Arkabrata\Downloads\alert.mp3")
+TEST_AUDIO_PATH = os.getenv("TEST_AUDIO_PATH", r"C:\Users\KIIT0001\Documents\GitHub\MultilingualScamDetection\test_voice.wav")
+ALERT_AUDIO_PATH = os.getenv("ALERT_AUDIO_PATH", r"alert.mp3")
 
 # Mount static directory for audio files
 app.mount("/static", StaticFiles(directory="static"), name="static")
