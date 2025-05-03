@@ -2,6 +2,7 @@ fastapi
 uvicorn
 pydantic
 google-genai
+google-generativeai
 google-api-python-client
 requests
 regex
