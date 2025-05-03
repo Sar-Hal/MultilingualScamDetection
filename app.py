@@ -112,7 +112,7 @@ def check_scam(content: str, lang: str) -> Tuple[bool, Dict]:
     lang_phrases = scam_phrases.get(lang, scam_phrases["en"])
     
     try:
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-pro')
         response = model.generate_content(
             f"Analyze for scam indicators in {lang}. Text: {content}",
             generation_config={"response_mime_type": "application/json"}
