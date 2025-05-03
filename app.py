@@ -18,6 +18,7 @@ from functools import lru_cache
 from dotenv import load_dotenv
 from langdetect import detect, LangDetectException
 import uvicorn
+import asyncio
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
