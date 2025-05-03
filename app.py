@@ -34,7 +34,7 @@ load_dotenv()
 
 app = FastAPI(title="Hybrid Multilingual Scam Detection API", version="1.1.0")
 
-# CORS middleware (from Code 1)
+# CORS middleware
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # Mount static directory
@@ -44,14 +44,14 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 google_api_key = os.getenv("GOOGLE_SAFE_BROWSING_API_KEY")
 
-# Language to alert audio mapping (from Code 2)
-ALERT_AUDIOS = {"en": "alert_en.mp3", "fr": "alert_fr.mp3", "es": "alert_es.mp3", "pt": "alert_pt.mp3", "hi": "alert_hi.mp3"}
+# Language to alert audio mapping
+ALERT_AUDIOS = {"en": "alert_en.wav", "fr": "alert_fr.wav", "es": "alert_es.wav", "pt": "alert_pt.wav", "hi": "alert_hi.wav"}
 
 # Input model
 class ContentInput(BaseModel):
     content: str
 
-# Detect language (from Code 2)
+# Detect language
 def detect_language(text: str) -> str:
     try:
         return detect(text)
@@ -59,7 +59,7 @@ def detect_language(text: str) -> str:
         logger.warning(f"Language detection failed for text: {text[:50]}...")
         return "en"
 
-# Scam detection with caching (from Code 2) and detailed output (from Code 1)
+# Scam detection with caching
 @lru_cache(maxsize=1000)
 def check_scam(content: str, lang: str) -> Tuple[bool, Dict]:
     content = content.strip()
@@ -102,7 +102,7 @@ def check_scam(content: str, lang: str) -> Tuple[bool, Dict]:
         logger.error(f"Gemini API error: {str(e)}")
         return False, {"risk_level": "Error", "confidence_score": 0, "detected_patterns": [], "justification": f"Error: {str(e)}"}
 
-# URL safety check (from Code 2)
+# URL safety check
 @lru_cache(maxsize=1000)
 def check_url(url: str) -> bool:
     try:
@@ -117,7 +117,7 @@ def check_url(url: str) -> bool:
         logger.error(f"Safe Browsing API error: {str(e)}")
         return False
 
-# Audio transcription with retry (from Code 2)
+# Audio transcription with retry
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
 def transcribe_audio(audio_file_path: str) -> Tuple[str, str]:
     try:
@@ -129,17 +129,29 @@ def transcribe_audio(audio_file_path: str) -> Tuple[str, str]:
         logger.error(f"Transcription failed: {str(e)}")
         return f"Error: {str(e)}", "en"
 
-# Dynamic audio alert generation with detailed report
+# Dynamic audio alert generation with detailed report and workaround for pyttsx3 saving issue
 def generate_audio_alert(report: Dict, lang: str) -> str:
     try:
-        alert_file = ALERT_AUDIOS.get(lang, "alert.mp3")
+        alert_file = ALERT_AUDIOS.get(lang, "alert_en.wav")
         alert_path = os.path.join("static", alert_file)
         report_text = f"Scam Alert. Risk Level: {report['risk_level']}. Confidence Score: {report['confidence_score']} out of 10. Justification: {report['justification']}."
         if report.get("detected_patterns"):
             patterns = "; ".join([f"Category: {p['category']}, Examples: {', '.join(p['examples_found'])}" for p in report['detected_patterns']])
             report_text += f" Detected Patterns: {patterns}."
-        if not os.path.exists(alert_path):
-            engine = pyttsx3.init()
+        # Workaround for pyttsx3 saving issue from search results
+        engine = pyttsx3.init()
+        # Use a temporary consistent filename to avoid naming issues as per search result [4]
+        temp_path = os.path.join("static", "temp_alert.wav")
+        engine.save_to_file(report_text, temp_path)
+        engine.runAndWait()
+        # Rename/move file to final location to avoid path-related issues
+        if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
+            os.rename(temp_path, alert_path)
+        else:
+            logger.warning(f"Temp audio file not created or empty: {temp_path}")
+            # Fallback: Play the audio to ensure processing completes
+            engine.say(report_text)
+            engine.runAndWait()
             engine.save_to_file(report_text, alert_path)
             engine.runAndWait()
         return f"/static/{alert_file}"
@@ -147,12 +159,12 @@ def generate_audio_alert(report: Dict, lang: str) -> str:
         logger.error(f"Audio alert failed: {str(e)}")
         return ""
 
-# Endpoints from Code 1 with detailed output
+# Endpoints with detailed output
 @app.post("/scan/text")
 async def scan_text(message: str = Form(...)):
     lang = detect_language(message)
     is_scam, result = check_scam(message, lang)
-    if is_scam:
+    if is_scam or result["risk_level"] == "Suspicious":
         result["audio_alert"] = generate_audio_alert(result, lang)
     return result
 
@@ -164,7 +176,7 @@ async def scan_voice(file: UploadFile = File(...)):
     text, lang = transcribe_audio(temp_path)
     os.remove(temp_path)
     is_scam, result = check_scam(text, lang)
-    if is_scam:
+    if is_scam or result["risk_level"] == "Suspicious":
         result["audio_alert"] = generate_audio_alert(result, lang)
     return result
 
@@ -186,7 +198,7 @@ def run_server():
     uvicorn.run(app, host="0.0.0.0", port=8001)
 
 # Test audio file for scams
-def test_audio_scam_detection(audio_path: str = "test_audio.wav"):
+def test_audio_scam_detection(audio_path: str = "test_voice.wav"):
     try:
         if not os.path.exists(audio_path):
             logger.error(f"Test audio file not found: {audio_path}")
@@ -200,7 +212,7 @@ def test_audio_scam_detection(audio_path: str = "test_audio.wav"):
         text, lang = transcribe_audio(audio_path)
         print(f"Transcribed text from test audio: {text} (language: {lang})")
         is_scam, result = check_scam(text, lang)
-        if is_scam:
+        if is_scam or result["risk_level"] == "Suspicious":
             result["audio_alert"] = generate_audio_alert(result, lang)
         print("Audio scam detection result:", result)
     except Exception as e:
