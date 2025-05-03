@@ -12,22 +12,23 @@ from googleapiclient.discovery import build
 from faster_whisper import WhisperModel
 import tempfile
 import logging
-import pyttsx3
 from tenacity import retry, stop_after_attempt, wait_fixed
 from typing import Tuple, Dict
 from functools import lru_cache
 from dotenv import load_dotenv
 from langdetect import detect, LangDetectException
-import threading
-import uvicorn
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create directories
-os.makedirs("static", exist_ok=True)
-os.makedirs("audio", exist_ok=True)
+# Create directories with error handling for Render's ephemeral filesystem
+try:
+    os.makedirs("static", exist_ok=True)
+    os.makedirs("audio", exist_ok=True)
+    logger.info("Created static and audio directories")
+except Exception as e:
+    logger.error(f"Failed to create directories: {str(e)}")
 
 # Load environment variables
 load_dotenv()
@@ -40,11 +41,11 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 # Mount static directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Configure API keys
+# Configure API keys from environment variables (set in Render)
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 google_api_key = os.getenv("GOOGLE_SAFE_BROWSING_API_KEY")
 
-# Language to alert audio mapping
+# Language to alert audio mapping (simplified for Render compatibility)
 ALERT_AUDIOS = {"en": "alert_en.wav", "fr": "alert_fr.wav", "es": "alert_es.wav", "pt": "alert_pt.wav", "hi": "alert_hi.wav"}
 
 # Input model
@@ -129,31 +130,13 @@ def transcribe_audio(audio_file_path: str) -> Tuple[str, str]:
         logger.error(f"Transcription failed: {str(e)}")
         return f"Error: {str(e)}", "en"
 
-# Dynamic audio alert generation with detailed report and workaround for pyttsx3 saving issue
+# Simplified audio alert generation for Render (avoiding pyttsx3 due to compatibility issues)
 def generate_audio_alert(report: Dict, lang: str) -> str:
     try:
         alert_file = ALERT_AUDIOS.get(lang, "alert_en.wav")
         alert_path = os.path.join("static", alert_file)
-        report_text = f"Scam Alert. Risk Level: {report['risk_level']}. Confidence Score: {report['confidence_score']} out of 10. Justification: {report['justification']}."
-        if report.get("detected_patterns"):
-            patterns = "; ".join([f"Category: {p['category']}, Examples: {', '.join(p['examples_found'])}" for p in report['detected_patterns']])
-            report_text += f" Detected Patterns: {patterns}."
-        # Workaround for pyttsx3 saving issue from search results
-        engine = pyttsx3.init()
-        # Use a temporary consistent filename to avoid naming issues as per search result [4]
-        temp_path = os.path.join("static", "temp_alert.wav")
-        engine.save_to_file(report_text, temp_path)
-        engine.runAndWait()
-        # Rename/move file to final location to avoid path-related issues
-        if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
-            os.rename(temp_path, alert_path)
-        else:
-            logger.warning(f"Temp audio file not created or empty: {temp_path}")
-            # Fallback: Play the audio to ensure processing completes
-            engine.say(report_text)
-            engine.runAndWait()
-            engine.save_to_file(report_text, alert_path)
-            engine.runAndWait()
+        # For Render, return a placeholder or pre-uploaded audio URL since pyttsx3 may not work
+        logger.info(f"Audio alert generation skipped on Render; using placeholder for {alert_file}")
         return f"/static/{alert_file}"
     except Exception as e:
         logger.error(f"Audio alert failed: {str(e)}")
@@ -193,44 +176,7 @@ async def scan_url(url: str = Form(...)):
         result["audio_alert"] = generate_audio_alert(report, "en")
     return result
 
-# Server execution
-def run_server():
-    uvicorn.run(app, host="0.0.0.0", port=8001)
-
-# Test audio file for scams
-def test_audio_scam_detection(audio_path: str = "test_voice.wav"):
-    try:
-        if not os.path.exists(audio_path):
-            logger.error(f"Test audio file not found: {audio_path}")
-            print(f"Test audio file not found: {audio_path}")
-            return
-        if os.path.getsize(audio_path) == 0:
-            logger.error(f"Test audio file is empty: {audio_path}")
-            print(f"Test audio file is empty: {audio_path}")
-            return
-        
-        text, lang = transcribe_audio(audio_path)
-        print(f"Transcribed text from test audio: {text} (language: {lang})")
-        is_scam, result = check_scam(text, lang)
-        if is_scam or result["risk_level"] == "Suspicious":
-            result["audio_alert"] = generate_audio_alert(result, lang)
-        print("Audio scam detection result:", result)
-    except Exception as e:
-        logger.error(f"Error during audio scam detection test: {str(e)}")
-        print(f"Error during audio scam detection test: {str(e)}")
-
 if __name__ == "__main__":
-    thread = threading.Thread(target=run_server, daemon=True)
-    thread.start()
-    
-    # Testing endpoints
-    test_message = "Please click on the link to verify your gpay account http://gpayindia.com"
-    response = requests.post("http://localhost:8001/scan/text", data={"message": test_message})
-    print("Text scan test:", response.json())
-    
-    test_url = "https://www.google.com"
-    response = requests.post("http://localhost:8001/scan/url", data={"url": test_url})
-    print("URL scan test:", response.json())
-    
-    # Test audio file for scams
-    test_audio_scam_detection("test_voice.wav")
+    # Use Render's PORT environment variable or default to 8000
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
