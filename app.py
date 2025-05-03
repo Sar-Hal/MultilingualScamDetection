@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import google.generativeai as genai
+import google.genai as genai  # Updated import as per previous guidance
 import os
 import requests
 import re
@@ -17,6 +17,7 @@ from typing import Tuple, Dict
 from functools import lru_cache
 from dotenv import load_dotenv
 from langdetect import detect, LangDetectException
+import uvicorn
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,7 @@ except Exception as e:
 # Load environment variables
 load_dotenv()
 
+# Initialize FastAPI with root_path if needed (adjust based on Render proxy if applicable)
 app = FastAPI(title="Hybrid Multilingual Scam Detection API", version="1.1.0")
 
 # CORS middleware
@@ -41,13 +43,17 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 # Mount static directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Configure API keys from environment variables (set in Render)
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Configure API keys from environment variables
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))  # Updated to match correct env var
 google_api_key = os.getenv("GOOGLE_SAFE_BROWSING_API_KEY")
 
-# Language to alert audio mapping (simplified for Render compatibility)
+# Language to alert audio mapping
 ALERT_AUDIOS = {"en": "alert_en.wav", "fr": "alert_fr.wav", "es": "alert_es.wav", "pt": "alert_pt.wav", "hi": "alert_hi.wav"}
 
+# Add a root endpoint for health check (suggested by search result [6])
+@app.get("/", summary="Health Check")
+async def root():
+    return {"status": "API is running", "message": "Welcome to the Scam Detection API. Use /scan/text, /scan/voice, or /scan/url endpoints."}
 # Input model
 class ContentInput(BaseModel):
     content: str
@@ -141,8 +147,7 @@ def generate_audio_alert(report: Dict, lang: str) -> str:
     except Exception as e:
         logger.error(f"Audio alert failed: {str(e)}")
         return ""
-
-# Endpoints with detailed output
+    
 @app.post("/scan/text")
 async def scan_text(message: str = Form(...)):
     lang = detect_language(message)
