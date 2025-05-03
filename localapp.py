@@ -238,9 +238,7 @@ def test_audio_scam_detection(audio_path: str = "test_voice.wav"):
 if __name__ == "__main__":
      thread = threading.Thread(target=run_server, daemon=True)
      thread.start()
- 
-     # Testing endpoints
-     test_message = "Please click on the link to verify your gpay account http://gpayindia.com"
+     test_message = "Congratulations! You have won a prize in our lucky draw. To claim your reward, please click the link below. Hurry, offer valid for today only!freeprizemoney.com"
      response = requests.post("http://localhost:8001/scan/text", data={"message": test_message})
      print("Text scan test:", response.json())
  
