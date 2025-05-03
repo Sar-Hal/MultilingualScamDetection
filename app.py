@@ -212,7 +212,7 @@ if __name__ == "__main__":
     thread.start()
     
     # Testing endpoints
-    test_message = "VERIFY your account http://fake-paypal-login.in"
+    test_message = "Please click on the link to verify your gpay account http://gpayindia.com"
     response = requests.post("http://localhost:8001/scan/text", data={"message": test_message})
     print("Text scan test:", response.json())
     
