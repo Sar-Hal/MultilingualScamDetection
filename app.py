@@ -14,7 +14,7 @@ import tempfile
 import logging
 import pyttsx3
 from tenacity import retry, stop_after_attempt, wait_fixed
-from typing import Tuple, Dict, List, Any
+from typing import Tuple, Dict
 from functools import lru_cache
 from dotenv import load_dotenv
 from langdetect import detect, LangDetectException
@@ -129,14 +129,18 @@ def transcribe_audio(audio_file_path: str) -> Tuple[str, str]:
         logger.error(f"Transcription failed: {str(e)}")
         return f"Error: {str(e)}", "en"
 
-# Dynamic audio alert generation (from Code 1)
-def generate_audio_alert(message: str, lang: str) -> str:
+# Dynamic audio alert generation with detailed report
+def generate_audio_alert(report: Dict, lang: str) -> str:
     try:
         alert_file = ALERT_AUDIOS.get(lang, "alert.mp3")
         alert_path = os.path.join("static", alert_file)
+        report_text = f"Scam Alert. Risk Level: {report['risk_level']}. Confidence Score: {report['confidence_score']} out of 10. Justification: {report['justification']}."
+        if report.get("detected_patterns"):
+            patterns = "; ".join([f"Category: {p['category']}, Examples: {', '.join(p['examples_found'])}" for p in report['detected_patterns']])
+            report_text += f" Detected Patterns: {patterns}."
         if not os.path.exists(alert_path):
             engine = pyttsx3.init()
-            engine.save_to_file(message, alert_path)
+            engine.save_to_file(report_text, alert_path)
             engine.runAndWait()
         return f"/static/{alert_file}"
     except Exception as e:
@@ -149,7 +153,7 @@ async def scan_text(message: str = Form(...)):
     lang = detect_language(message)
     is_scam, result = check_scam(message, lang)
     if is_scam:
-        result["audio_alert"] = generate_audio_alert(result["justification"], lang)
+        result["audio_alert"] = generate_audio_alert(result, lang)
     return result
 
 @app.post("/scan/voice")
@@ -161,7 +165,7 @@ async def scan_voice(file: UploadFile = File(...)):
     os.remove(temp_path)
     is_scam, result = check_scam(text, lang)
     if is_scam:
-        result["audio_alert"] = generate_audio_alert(result["justification"], lang)
+        result["audio_alert"] = generate_audio_alert(result, lang)
     return result
 
 @app.post("/scan/url")
@@ -173,18 +177,41 @@ async def scan_url(url: str = Form(...)):
         "details": []
     }
     if is_scam:
-        result["audio_alert"] = generate_audio_alert(f"Warning: Malicious URL detected - {url}", "en")
+        report = {"risk_level": "Scam", "confidence_score": 9, "justification": f"Malicious URL detected - {url}", "detected_patterns": []}
+        result["audio_alert"] = generate_audio_alert(report, "en")
     return result
 
 # Server execution
 def run_server():
     uvicorn.run(app, host="0.0.0.0", port=8001)
 
+# Test audio file for scams
+def test_audio_scam_detection(audio_path: str = "test_audio.wav"):
+    try:
+        if not os.path.exists(audio_path):
+            logger.error(f"Test audio file not found: {audio_path}")
+            print(f"Test audio file not found: {audio_path}")
+            return
+        if os.path.getsize(audio_path) == 0:
+            logger.error(f"Test audio file is empty: {audio_path}")
+            print(f"Test audio file is empty: {audio_path}")
+            return
+        
+        text, lang = transcribe_audio(audio_path)
+        print(f"Transcribed text from test audio: {text} (language: {lang})")
+        is_scam, result = check_scam(text, lang)
+        if is_scam:
+            result["audio_alert"] = generate_audio_alert(result, lang)
+        print("Audio scam detection result:", result)
+    except Exception as e:
+        logger.error(f"Error during audio scam detection test: {str(e)}")
+        print(f"Error during audio scam detection test: {str(e)}")
+
 if __name__ == "__main__":
     thread = threading.Thread(target=run_server, daemon=True)
     thread.start()
     
-    # Testing endpoints (from Code 1)
+    # Testing endpoints
     test_message = "VERIFY your account http://fake-paypal-login.in"
     response = requests.post("http://localhost:8001/scan/text", data={"message": test_message})
     print("Text scan test:", response.json())
@@ -192,3 +219,6 @@ if __name__ == "__main__":
     test_url = "https://www.google.com"
     response = requests.post("http://localhost:8001/scan/url", data={"url": test_url})
     print("URL scan test:", response.json())
+    
+    # Test audio file for scams
+    test_audio_scam_detection("test_voice.wav")
