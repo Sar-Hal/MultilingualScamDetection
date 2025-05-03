@@ -153,10 +153,26 @@ def check_url(url: str) -> bool:
 
 # Audio processing
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
+
 def transcribe_audio(file_path: str) -> Tuple[str, str]:
     try:
-        model = WhisperModel("base", device="cpu")
-        segments, info = model.transcribe(file_path, beam_size=5)
+        # Specify compute_type explicitly for CPU
+        model = WhisperModel("base", 
+                           device="cpu", 
+                           compute_type="int8",  # Required for CPU
+                           download_root="/tmp/whisper")  # Set cache directory
+                           
+        segments, info = model.transcribe(
+            file_path,
+            beam_size=5,
+            language="en",  # Force language if known
+            vad_filter=True  # Add voice activity detection
+        )
+        
+        # Handle empty segments
+        if not segments:
+            return "", "en"  # Default to English if no speech detected
+            
         return " ".join(segment.text for segment in segments), info.language or "en"
     except Exception as e:
         logger.error(f"Transcription failed: {str(e)}")
@@ -177,11 +193,29 @@ async def scan_text(message: str = Form(...)):
 @app.post("/scan/voice")
 async def scan_voice(file: UploadFile = File(...)):
     try:
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(await file.read())
+        # Validate audio format
+        if not file.filename.lower().endswith(('.wav', '.mp3', '.ogg')):
+            raise HTTPException(400, "Unsupported audio format")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            content = await file.read()
+            
+            # Basic audio validation (minimum 1KB)
+            if len(content) < 1024:
+                raise HTTPException(400, "Audio file too small")
+                
+            tmp.write(content)
             tmp_path = tmp.name
-        
-        text, lang = transcribe_audio(tmp_path)
+
+        # Add timeout for transcription
+        try:
+            text, lang = await asyncio.wait_for(
+                asyncio.to_thread(transcribe_audio, tmp_path),
+                timeout=30  # 30 seconds timeout
+            )
+        except asyncio.TimeoutError:
+            raise HTTPException(408, "Audio processing timed out")
+            
         os.remove(tmp_path)
         
         is_scam, result = check_scam(text, lang)
@@ -192,9 +226,11 @@ async def scan_voice(file: UploadFile = File(...)):
             "details": result,
             "audio": f"/static/{ALERT_AUDIOS.get(lang, 'alert_en.wav')}" if is_scam else ""
         }
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"Voice processing failed: {str(e)}")
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, "Failed to process audio")
 
 @app.post("/scan/url")
 async def scan_url(url: str = Form(...)):

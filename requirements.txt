@@ -12,3 +12,6 @@ python-dotenv
 pyttsx3
 tenacity
 python-multipart
+ctranslate2
+ffmpeg-python
+numpy
