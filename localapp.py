@@ -1,5 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, Form # Removed HTTPException
-from fastapi.responses import JSONResponse # Removed leading space
+from fastapi import FastAPI, UploadFile, File, Form 
+from fastapi.responses import JSONResponse 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -122,9 +122,6 @@ def check_url(url: str) -> bool:
      except Exception as e:
          logger.error(f"Safe Browsing API error: {str(e)}")
          return False
- 
- # Audio transcription with retry (from Code 2)
- # Audio transcription with retry
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
 def transcribe_audio(audio_file_path: str) -> Tuple[str, str]:
      try:
@@ -247,4 +244,5 @@ if __name__ == "__main__":
      test_url = "https://www.google.com"
      response = requests.post("http://localhost:8001/scan/url", data={"url": test_url})
      print("URL scan test:", response.json())
-     test_audio_scam_detection("test_voice.wav")
+
+     
